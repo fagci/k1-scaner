@@ -134,21 +134,35 @@ int main(void) {
                 line[lpos] = 0; lpos = 0;
                 char *p = line;
 
-                if (line[0] == 'S') {
-                    uint32_t a = 0, b = 0, step = 25;
-                    char *pp = line + 1; while (*pp == ' ') pp++;
-                    while (*pp >= '0' && *pp <= '9') a = a*10 + *pp++ - '0';
-                    if (*pp == '.') pp++;
-                    while (*pp >= '0' && *pp <= '9') pp++;
-                    while (*pp == ' ') pp++;
-                    while (*pp >= '0' && *pp <= '9') b = b*10 + *pp++ - '0';
-                    if (*pp == '.') pp++;
-                    while (*pp >= '0' && *pp <= '9') pp++;
-                    while (*pp == ' ') pp++;
-                    while (*pp >= '0' && *pp <= '9') step = step*10 + *pp++ - '0';
-                    if (*pp == '.') pp++;
-                    while (*pp >= '0' && *pp <= '9') pp++;
-                    do_scan_range(pp, a*100000, b*100000, step*100);
+                // SCAN_SL должен быть до S
+                if (memcmp(line, "SCAN_SL", 7) == 0) {
+                    char name[32] = "scanlist_";
+                    char *pp = line + 7; while (*pp == ' ') pp++;
+                    int ni = 9; while (*pp && *pp != ' ' && ni < 30) name[ni++] = *pp++;
+                    name[ni] = 0;
+                    ScanListIdx sl2; sl2.count = 0;
+                    Storage_Load(name, 0, &sl2, sizeof(sl2));
+                    if (sl2.count == 0) OUT("NO %s", name);
+                    else {
+                        OUT("SCAN %s count=%u chcnt=%u", name, sl2.count, gChannelCount);
+                        for (uint16_t si = 0; si < sl2.count; si++) {
+                            uint16_t ci = sl2.idx[si];
+                            OUT("  idx=%u ch_idx=%u freq=%lu", si, ci, ci < gChannelCount ? gChannels[ci].freq : 0);
+                            if (ci < gChannelCount) scan_freq(gChannels[ci].freq, gChannels[ci].squelch, 0);
+                        }
+                        OUT("DONE");
+                    }
+                } else if (line[0] == 'S') {
+                    // парсим "MHz.MHz MHz.MHz kHz" → единицы *100000 и *100
+                    uint32_t a_m=0,a_f=0, b_m=0,b_f=0, s_m=0,s_f=0, p=0;
+                    char *pp = line + 1;
+                    sscanf(pp, "%u.%u %u.%u %u.%u%n", &a_m,&a_f, &b_m,&b_f, &s_m,&s_f, &p);
+                    if (p == 0) sscanf(pp, "%u %u %u%n", &a_m, &b_m, &s_m, &p);
+                    uint32_t a = a_m * 100000 + a_f;
+                    uint32_t b = b_m * 100000 + b_f;
+                    uint32_t st = s_m * 100 + s_f;
+                    if (st == 0) st = 2500;
+                    do_scan_range(pp + p, a, b, st);
                 } else if (line[0] == 'F') {
                     uint32_t m = 0, f = 0;
                     sscanf(line + 1, "%lu.%lu", &m, &f);
@@ -217,20 +231,6 @@ int main(void) {
                     ScanListIdx sl2; sl2.count = gScanCount; memcpy(sl2.idx, gScanList, gScanCount * 2);
                     Storage_Save("scanlist.sl", 0, &sl2, sizeof(sl2));
                     OUT("SL %u", gScanCount);
-                } else if (line[0] == 'G') {
-                    ScanListIdx sl2; sl2.count = 0;
-                    Storage_Load("scanlist.sl", 0, &sl2, sizeof(sl2));
-                    if (sl2.count == 0) OUT("NO SL");
-                    else { OUT("SCAN_SL"); for (uint16_t si = 0; si < sl2.count; si++) { uint16_t ci = sl2.idx[si]; if (ci < gChannelCount) scan_freq(gChannels[ci].freq, gChannels[ci].squelch, 0); } OUT("DONE"); }
-                } else if (line[0] == 'S' && line[1] == 'C' && line[2] == 'A' && line[3] == 'N' && line[4] == '_' && line[5] == 'S' && line[6] == 'L') {
-                    char name[32] = "scanlist_";
-                    char *pp = line + 7; while (*pp == ' ') pp++;
-                    int ni = 9; while (*pp && *pp != ' ' && ni < 30) name[ni++] = *pp++;
-                    name[ni] = 0;
-                    ScanListIdx sl2; sl2.count = 0;
-                    Storage_Load(name, 0, &sl2, sizeof(sl2));
-                    if (sl2.count == 0) OUT("NO %s", name);
-                    else { OUT("SCAN %s", name); for (uint16_t si = 0; si < sl2.count; si++) { uint16_t ci = sl2.idx[si]; if (ci < gChannelCount) scan_freq(gChannels[ci].freq, gChannels[ci].squelch, 0); } OUT("DONE"); }
                 } else if (line[0] == 'P') {
                     int idx = 0, gain = 0, sql = 0, mod = 0; uint32_t m = 0, f = 0;
                     sscanf(line + 1, "%d %lu.%lu %d %d %d", &idx, &m, &f, &gain, &sql, &mod);
