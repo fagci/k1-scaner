@@ -49,7 +49,7 @@ Requires DTR enabled (most terminals do this automatically).
 | Command | Description |
 |---------|-------------|
 | `S a b st [k=v]` | Range scan: `S 430 440 25 sql=3 wl=1` |
-| `CH_ADD f [name]` | Add channel: `CH_ADD 172.3 DPS` |
+| `CH_ADD f [name]` | Add channel: `CH_ADD 433.125 ViraMaina` |
 | `CH_LS` | List channels |
 | `CH_RM i` | Remove channel |
 | `SCAN_ADD l h st` | Add range as channel: `SCAN_ADD 430 440 25` |
