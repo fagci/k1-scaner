@@ -20,7 +20,8 @@ BUILD_TAG     := $(shell date -u +'%Y%m%d_%H%M')
 SRC := $(wildcard $(SRC_DIR)/*.c) \
        $(wildcard $(SRC_DIR)/driver/*.c) \
        $(wildcard $(SRC_DIR)/helper/*.c) \
-       $(wildcard $(SRC_DIR)/ui/*.c)
+       $(wildcard $(SRC_DIR)/ui/*.c) \
+       $(wildcard $(SRC_DIR)/app/*.c)
 
 OBJS := $(OBJ_DIR)/start.o \
         $(OBJ_DIR)/init.o \

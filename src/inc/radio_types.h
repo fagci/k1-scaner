@@ -32,7 +32,7 @@ typedef struct {
 } ParamSet;
 
 // ── ScanEntry ───────────────────────────────────────────────────────────
-#define MAX_CHANNELS 200
+#define MAX_CHANNELS 100
 
 typedef struct {
     uint32_t freq;

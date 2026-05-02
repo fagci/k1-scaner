@@ -26,15 +26,34 @@ void HardFault_Handler(void) {
     uint32_t stacked_sp;
     __asm volatile("mrs %0, msp" : "=r"(stacked_sp));
     uint32_t *sp = (uint32_t *)stacked_sp;
+    uint32_t pc = sp[6];
 
-    // пытаемся дождаться USB
-    for (volatile int i = 0; i < 500000; i++);
+    // инициализируем LCD напрямую, если не инициализирован
+    *((volatile uint32_t *)0x40021018) |= (1 << 18); // RCC APB2 SPI1EN
+    *((volatile uint32_t *)0x4002100C) |= (1 << 28); // RCC IOPCEN
+    *((volatile uint32_t *)0x40021000) |= (1 << 20); // RCC IOPAEN
+    *((volatile uint32_t *)0x40021004) |= (1 << 23); // RCC IOPBEN
 
-    DBG_HardFaultDump(sp);
+    // выводим PC на экран через графику (упрощённо — просто моргаем)
+    // моргаем PC кодом: длинная пауза = старшие биты, короткая = младшие
+    for (int r = 0; r < 3; r++) {
+        uint16_t mask = (pc >> 16) >> (r * 8);
+        for (int b = 0; b < 8; b++) {
+            GPIO_TogglePin(GPIO_PIN_FLASHLIGHT);
+            if (mask & (1 << (7 - b))) {
+                SYSTICK_DelayMs(400);  // 1
+            } else {
+                SYSTICK_DelayMs(100);  // 0
+            }
+            GPIO_TogglePin(GPIO_PIN_FLASHLIGHT);
+            SYSTICK_DelayMs(200);
+        }
+        SYSTICK_DelayMs(1000); // разделитель байтов
+    }
 
     while (1) {
-        SYSTICK_DelayMs(300);
         GPIO_TogglePin(GPIO_PIN_FLASHLIGHT);
+        SYSTICK_DelayMs(500);
     }
 }
 
