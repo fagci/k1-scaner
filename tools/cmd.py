@@ -19,7 +19,7 @@ def main():
         cmd_idx = 2
 
     command = sys.argv[cmd_idx]
-    timeout = 30 if command.startswith('SPECTRUM') or command.startswith('S ') else 5
+    timeout = 30 if command.startswith('SPECTRUM') or command.startswith('S ') or command == 'SCR' else 5
 
     ser = serial.Serial(port, 115200, timeout=2)
     time.sleep(0.3)

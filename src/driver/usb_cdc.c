@@ -6,7 +6,7 @@
 #include "usbd_cdc_if.h"
 #include <string.h>
 
-#define TX_BUF_SIZE 128
+#define TX_BUF_SIZE 512
 
 static bool connected;
 static uint8_t tx_buf[TX_BUF_SIZE];
@@ -48,12 +48,33 @@ void USB_CDC_Poll(void) {
 }
 
 void USB_CDC_Write(const uint8_t *data, uint32_t len) {
-    if (!connected || !len) return;
-    for (uint32_t i = 0; i < len; i++) {
-        uint16_t next = (tx_head + 1) % TX_BUF_SIZE;
-        if (next == tx_tail) break;  // buffer full, drop
-        tx_buf[tx_head] = data[i];
-        tx_head = next;
+    if (!len) return;
+    while (len > 0) {
+        // сколько свободно
+        uint16_t space;
+        if (tx_head >= tx_tail) {
+            space = TX_BUF_SIZE - tx_head;
+            if (tx_tail == 0) space--; // одно место резерв
+        } else {
+            space = tx_tail - tx_head - 1;
+        }
+        if (space == 0) {
+            USB_CDC_Poll();
+            continue;
+        }
+        uint16_t chunk = (len > space) ? space : len;
+        if (tx_head + chunk <= TX_BUF_SIZE) {
+            memcpy(tx_buf + tx_head, data, chunk);
+        } else {
+            // wrap
+            uint16_t first = TX_BUF_SIZE - tx_head;
+            memcpy(tx_buf + tx_head, data, first);
+            memcpy(tx_buf, data + first, chunk - first);
+        }
+        tx_head = (tx_head + chunk) % TX_BUF_SIZE;
+        data += chunk;
+        len -= chunk;
+        USB_CDC_Poll();
     }
 }
 

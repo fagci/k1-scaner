@@ -97,6 +97,11 @@ static void cmd_PR_WR(const char *a) { int idx=parse_int(&a);uint32_t m=parse_mh
 static void cmd_PR_LS(const char *a) { (void)a; for(uint8_t i=0;i<MAX_RX_PROFILES;i++){char b[32];snprintf_(b,32,"%u %u\n",(unsigned)i,(unsigned)gRxProfiles[i].freq_anchor);USB_CDC_Write((uint8_t*)b,strlen(b));} }
 static void cmd_K(const char *a) { uint32_t reg=parse_hex(&a); OUTF("R%02lX=0x%04X",reg,BK4819_ReadRegister((BK4819_REGISTER_t)reg)); }
 static void cmd_K_WR(const char *a) { uint32_t reg=parse_hex(&a);while(*a==' ')a++;uint32_t val=parse_hex(&a);BK4819_WriteRegister((BK4819_REGISTER_t)reg,(uint16_t)val); OUTF("R%02lX=0x%04lX",reg,val); }
+static void cmd_LS(const char *a);
+static void cmd_CAT(const char *a);
+static void cmd_RM(const char *a);
+static void cmd_SCR(const char *a);
+static void cmd_SPECTRUM(const char *a);
 
 static const Cmd cmds[] = {
     {"SCAN_ADD",cmd_SCAN_ADD},{"SCAN_SL",cmd_SCAN_SL},
@@ -106,12 +111,77 @@ static const Cmd cmds[] = {
     {"LW_LS",cmd_LW_LS},{"LW_CLR",cmd_LW_CLR},
     {"PR_WR",cmd_PR_WR},{"PR_LS",cmd_PR_LS},
     {"LOOP",cmd_LOOP},{"K_WR",cmd_K_WR},
+    {"LS",cmd_LS},{"CAT",cmd_CAT},{"RM",cmd_RM},
+    {"SCR",cmd_SCR},{"SPECTRUM",cmd_SPECTRUM},
     {"G",cmd_G},{"U",cmd_U},{"K",cmd_K},
+    {"LS",cmd_LS},{"CAT",cmd_CAT},{"RM",cmd_RM},
+    {"SCR",cmd_SCR},{"SPECTRUM",cmd_SPECTRUM},
     {"RESET",cmd_RESET},
     {"h",cmd_h},{"?",cmd_h},
 };
 
 // ── main ───────────────────────────────────────────────────────────────
+// ── файловые команды ──────────────────────────────────────────────────
+static void cmd_LS(const char *a) { (void)a;
+    lfs_dir_t dir; struct lfs_info info;
+    if (lfs_dir_open(&gLfs, &dir, "/") == 0) {
+        while (lfs_dir_read(&gLfs, &dir, &info) > 0) {
+            if (info.type == LFS_TYPE_DIR) continue;
+            OUTF("%s %lu", info.name, info.size);
+        }
+        lfs_dir_close(&gLfs, &dir);
+    }
+}
+static uint8_t gFileBuf[256];
+static void cmd_CAT(const char *a) {
+    while (*a == ' ') a++;
+    lfs_file_t f;
+    struct lfs_file_config cfg = { .buffer = gFileBuf, .attr_count = 0 };
+    if (lfs_file_opencfg(&gLfs, &f, a, LFS_O_RDONLY, &cfg) < 0) { OUT("NOT FOUND\n"); return; }
+    uint8_t buf[64]; int r;
+    while ((r = lfs_file_read(&gLfs, &f, buf, 64)) > 0) USB_CDC_Write(buf, r);
+    lfs_file_close(&gLfs, &f);
+    OUT("\n");
+}
+static void cmd_RM(const char *a) {
+    while (*a == ' ') a++;
+    if (lfs_remove(&gLfs, a) == 0) OUT("OK\n"); else OUT("ERR\n");
+}
+// ── скриншот ──────────────────────────────────────────────────────────
+static void cmd_SCR(const char *a) { (void)a;
+    USB_CDC_WriteString("P1\n128 64\n");
+    char buf[260];
+    for (uint8_t y = 0; y < LCD_HEIGHT; y++) {
+        char *p = buf;
+        for (uint8_t x = 0; x < LCD_WIDTH; x++) {
+            if (x) *p++ = ' ';
+            *p++ = GetPixel(x, y) ? '1' : '0';
+        }
+        *p++ = '\n';
+        // отправляем строку целиком, USB_CDC_Write сама разобьёт и подождёт
+        USB_CDC_Write((uint8_t*)buf, p - buf);
+    }
+}
+// ── дамп спектра ──────────────────────────────────────────────────────
+static void cmd_SPECTRUM(const char *a) {
+    uint32_t lo = parse_mhz(&a); uint32_t hi = parse_mhz(&a);
+    uint32_t step = parse_khz(&a); if (step == 0) step = 2500;
+    BK4819_Squelch(3, lo, 1, 1);
+    USB_CDC_WriteString("freq,rssi,noise,glitch\n");
+    char buf[40];
+    for (uint32_t f = lo; f <= hi; f += step) {
+        BK4819_TuneTo(f, 0); SYSTICK_DelayUs(8000);
+        uint16_t rssi = BK4819_GetRSSI();
+        uint8_t noise = BK4819_GetNoise();
+        uint8_t glitch = BK4819_GetGlitch();
+        int n = snprintf_(buf, 40, "%lu,%u,%u,%u\n", f, rssi, noise, glitch);
+        if (n > 0) {
+            USB_CDC_Write((uint8_t*)buf, n);
+            USB_CDC_Poll(); // доливаем буфер
+        }
+    }
+}
+
 int main(void) {
     SYSTICK_Init(); HRTIME_Init(); BOARD_Init();
     USB_CDC_Init(); DBG_Init();

@@ -12,7 +12,10 @@ Designed for fast, automated scanning with USB CDC control and on-device UI.
 - **Loot** — discovered frequencies, deduplicated, auto-save to channels
 - **Channels** — persistent storage, add/remove/list
 - **RxProfiles** — per-frequency gain, squelch, modulation presets
-- **On-device UI** — 5 Tabs (Range, Loot, Channels, Scanlist, Blacklist) + Settings
+- **On-device UI** — 6 Tabs (Range, Loot, Channels, Scanlist, Blacklist, Settings)
+- **Screenshot** — `SCR` command, PBM format, viewable via ImageMagick
+- **Spectrum dump** — `SPECTRUM` command, CSV output (freq,rssi,noise,glitch)
+- **File manager** — `LS`, `CAT`, `RM` commands for LittleFS files
 - **BK4819 register read/write** — `K 38`, `K_WR 40 1F40`
 - **Autotests** — `tools/test_cmds.py`, 21/21 passed
 
@@ -66,6 +69,11 @@ Requires DTR enabled (most terminals do this automatically).
 | `PR_LS` | List RxProfiles |
 | `K hex` | Read BK4829 register |
 | `K_WR hex val` | Write BK4829 register |
+| `LS` | List LittleFS files |
+| `CAT <file>` | Print file contents |
+| `RM <file>` | Delete file |
+| `SCR` | Screenshot (P1 PBM, 128x64) |
+| `SPECTRUM lo hi step` | CSV dump: freq,rssi,noise,glitch |
 | `U` | Uptime in ms |
 | `RESET` | Clear all stored data |
 
