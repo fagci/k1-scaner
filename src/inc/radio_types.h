@@ -36,11 +36,14 @@ typedef struct {
 
 typedef struct {
     uint32_t freq;
+    uint32_t freq_end;      // 0 = одиночный канал, >0 = диапазон
+    char     name[10];
     uint16_t dwell_ms;
     uint16_t rx_profile;
     uint8_t  squelch;
+    uint8_t  step_khz;      // шаг для диапазона, 0 = 25
     uint8_t  flags;
-} ScanEntry;
+} ScanEntry;  // 26 байт
 
 // ── RxProfile ───────────────────────────────────────────────────────────
 #define MAX_RX_PROFILES 16
