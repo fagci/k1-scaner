@@ -19,7 +19,7 @@ Designed for fast, automated scanning with USB CDC control and on-device UI.
 ## Hardware
 
 - MCU: PY32F071 (Cortex-M0+, 48MHz, 16KB RAM, 128KB Flash)
-- Radio: BK4819
+- Radio: BK4829 (BK4819 compatible)
 - Display: ST7565 128x64
 - Storage: PY25Q16 SPI flash + LittleFS
 - USB: CDC ACM via CherryUSB stack
@@ -64,8 +64,8 @@ Requires DTR enabled (most terminals do this automatically).
 | `LW_LS / LW_CLR` | Loot list / clear |
 | `PR_WR i f g s m` | Write RxProfile |
 | `PR_LS` | List RxProfiles |
-| `K hex` | Read BK4819 register |
-| `K_WR hex val` | Write BK4819 register |
+| `K hex` | Read BK4829 register |
+| `K_WR hex val` | Write BK4829 register |
 | `U` | Uptime in ms |
 | `RESET` | Clear all stored data |
 
@@ -91,7 +91,7 @@ src/
   main.c             — init, main loop, CDC console
   app/app.c          — FSM: IDLE / SCAN / LISTEN
   app/ui.c           — display, tabs, key handling
-  driver/            — BK4819, ST7565, USB CDC, GPIO, IWDG, RTC, timers
+  driver/            — BK4829, ST7565, USB CDC, GPIO, IWDG, RTC, timers
   helper/            — measurements, storage (LittleFS)
   inc/               — radio_types.h, common types
   ui/                — graphics primitives, fonts
