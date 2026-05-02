@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install ARM GCC toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Build firmware
+        run: make -j$(nproc)
+
+      - name: Upload firmware binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: k1-scaner-firmware
+          path: bin/k1-scaner.bin
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pyserial
+
+      - name: Check syntax
+        run: |
+          python3 -m py_compile tools/test_cmds.py
+          python3 -m py_compile tools/rtc_sync.py
