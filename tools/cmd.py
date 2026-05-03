@@ -1,45 +1,42 @@
 #!/usr/bin/env python3
-"""Send a single CDC command to k1-scaner and print the response.
+"""Send a single CDC command and print response.
 
 Usage:
     ./tools/cmd.py 'CH_LS'                           # list channels
     ./tools/cmd.py 'SPECTRUM 400 470 25' > spec.csv  # dump spectrum
-    ./tools/cmd.py 'SCR' > shot.pbm                  # screenshot
-    ./tools/cmd.py 'LS'                              # list files
-    ./tools/cmd.py 'CAT settings.cfg'                # read file
+    ./tools/cmd.py 'SCR' > shot.pbm                  # screenshot (~16KB)
+    ./tools/cmd.py 'LS' | head -5                    # list files
 """
 import sys, time, serial
 
 def main():
-    if len(sys.argv) < 3:
-        port = '/dev/ttyACM0'
-        cmd_idx = 1
-    else:
-        port = sys.argv[1]
-        cmd_idx = 2
+    port = sys.argv[1] if len(sys.argv) >= 3 else '/dev/ttyACM0'
+    cmd  = sys.argv[2] if len(sys.argv) >= 3 else sys.argv[1]
+    timeout = 30 if cmd.startswith('SPECTRUM') else 5
 
-    command = sys.argv[cmd_idx]
-    timeout = 30 if command.startswith('SPECTRUM') or command.startswith('S ') or command == 'SCR' else 5
-
-    ser = serial.Serial(port, 115200, timeout=2)
+    ser = serial.Serial(port, 115200, timeout=1)
     time.sleep(0.3)
     ser.reset_input_buffer()
     ser.read_all()
-
-    ser.write((command + '\n').encode())
+    ser.write((cmd + '\n').encode())
 
     out = b''
-    end = time.time() + timeout
-    while time.time() < end:
-        b = ser.read(1)
+    t0 = time.time()
+    # читаем блоками по 4KB
+    while time.time() - t0 < timeout:
+        b = ser.read(4096)
         if b:
             out += b
-            if b == b'\n' and (b'DONE' in out or b'OK' in out or b'?' in out):
-                # ждём ещё немного возможных данных
-                time.sleep(0.2)
+            # для SCR: 16KB достаточно
+            if cmd == 'SCR' and len(out) >= 16384:
+                break
+            # для остальных: ждём маркер
+            if b'DONE' in out or b'OK\n' in out or b'?\n' in out:
+                time.sleep(0.1)
                 out += ser.read_all()
                 break
         else:
+            if out: break
             time.sleep(0.05)
 
     sys.stdout.buffer.write(out)
