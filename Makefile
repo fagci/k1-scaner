@@ -21,7 +21,8 @@ SRC := $(wildcard $(SRC_DIR)/*.c) \
        $(wildcard $(SRC_DIR)/driver/*.c) \
        $(wildcard $(SRC_DIR)/helper/*.c) \
        $(wildcard $(SRC_DIR)/ui/*.c) \
-       $(wildcard $(SRC_DIR)/app/*.c)
+       $(wildcard $(SRC_DIR)/app/*.c) \
+       $(OBJ_DIR)/app/cmd.o
 
 OBJS := $(OBJ_DIR)/start.o \
         $(OBJ_DIR)/init.o \
