@@ -7,8 +7,8 @@
 typedef enum { APP_IDLE, APP_SCAN, APP_LISTEN } AppState;
 
 typedef struct {
-    uint8_t noise_threshold;  // 0..255, шум ниже = сигнал
-    uint8_t scan_action;      // 0=skip, 1=WL auto, 2=BL auto, 3=listen
+    uint8_t noise_threshold;
+    uint8_t scan_action;  // 0=skip, 1=WL auto, 2=BL auto, 3=listen
     uint16_t dwell_ms;
 } ScanSettings;
 
@@ -19,12 +19,13 @@ void APP_Stop(void);
 void APP_SetSettings(const ScanSettings *s);
 ScanSettings *APP_GetSettings(void);
 
-void APP_StartScan(uint32_t lo, uint32_t hi, uint32_t step);
-void APP_StartScanList(const uint16_t *list, uint16_t count);
+// Запуск полного сценария: все диапазоны + SL + BL-исключения
+void APP_StartFullScan(void);
+
 void APP_Listen(uint16_t ch_index);
 
-extern uint32_t gLastFreq;
-extern uint32_t gListenFreq;
-extern bool gListenAudioOn;
+// Текущая частота сканирования (для UI)
+extern uint32_t gScanCurrentFreq;
+extern uint32_t gScanProgress;  // 0..1000
 
 #endif

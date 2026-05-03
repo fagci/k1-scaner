@@ -21,7 +21,8 @@ extern LootItem gLoot[]; extern uint8_t gLootCount; extern uint32_t gLootTotal;
 extern ScanEntry gChannels[]; extern uint16_t gChannelCount;
 extern uint16_t gScanList[]; extern uint16_t gScanCount;
 extern BlackItem gBlack[]; extern uint8_t gBlackCount;
-extern uint32_t gLastFreq;
+extern uint32_t gScanCurrentFreq;
+extern uint32_t gScanProgress;
 extern uint32_t gListenFreq;
 extern bool gListenAudioOn;
 extern void ch_save(void);
@@ -35,8 +36,6 @@ static const uint32_t gPresets[PCOUNT][3] = {
 typedef enum { TAB_RANGE, TAB_LOOT, TAB_CH, TAB_SL, TAB_BL, TAB_SET, TAB_NUM } Tab;
 static Tab gTab;
 static uint16_t gScroll, gCursor;
-static uint32_t gLastProgDraw;
-static uint32_t gScanDisplayFreq;
 static bool gScanning;
 
 static void save_settings(void) {
@@ -47,11 +46,14 @@ static void save_settings(void) {
 void UI_Init(void) { gTab = TAB_RANGE; gScroll = 0; gCursor = 0; }
 
 void ui_draw_scan_progress(uint32_t freq) {
-    if (Now() - gLastProgDraw < 80) return;
-    gLastProgDraw = Now(); gScanning = 1; gScanDisplayFreq = freq;
+    gScanning = 1;
     FillRect(0, LIST_Y, LCD_WIDTH, LIST_H, C_CLEAR);
     PrintSmall(2, YY(LIST_Y + 2), ">> %lu.%05lu", freq / 100000, freq % 100000);
-    PrintSmallEx(LCD_XCENTER, YY(LCD_HEIGHT - 2), POS_C, C_FILL, "any=stop");
+    // прогресс-бар
+    uint8_t bar_w = (uint8_t)(gScanProgress * 100 / 1000);
+    if (bar_w > 100) bar_w = 100;
+    FillRect(2, YY(LIST_Y + 12), bar_w * 124 / 100, 3, C_FILL);
+    PrintSmallEx(LCD_XCENTER, YY(LIST_Y + 20), POS_C, C_FILL, "%u%%", (unsigned)(gScanProgress / 10));
     ST7565_Blit();
 }
 
@@ -64,19 +66,11 @@ static void draw_tabs(void) {
 }
 
 static void draw_status(void) {
-    if (gScanning) return;
-    // последняя активная частота
-    uint32_t disp = gListenAudioOn ? gListenFreq : gLastFreq;
-    const char *tag = "";
-    if (gListenAudioOn) tag = " RX";
-    else if (disp) {
-        if (disp == gLastFreq) tag = "";
-        // можно добавить +WL / -BL
-    }
-    if (disp)
-        PrintSmall(1, YY(STATUS_Y + 1), "%lu.%05lu%s", disp / 100000, disp % 100000, tag);
-    else
+    if (APP_GetState() != APP_IDLE) {
+        PrintSmall(1, YY(STATUS_Y + 1), ">> %lu.%05lu", gScanCurrentFreq / 100000, gScanCurrentFreq % 100000);
+    } else {
         PrintSmall(1, YY(STATUS_Y + 1), "ch%u l%u", gChannelCount, gLootCount);
+    }
     if (USB_CDC_IsReady()) PrintSmallEx(LCD_WIDTH - 1, YY(STATUS_Y + 1), POS_R, C_FILL, "CDC");
 }
 
@@ -137,8 +131,9 @@ static void draw_list(void) {
         PrintSmall(2, YY(LIST_Y+10), "%sact:%s", mark[1], action_names[s->scan_action]);
         PrintSmall(2, YY(LIST_Y+18), "%sdwell:%ums", mark[2], s->dwell_ms);
         break;
+    default: break;
     }
-    }
+}
 }
 
 void UI_Draw(void) {
@@ -147,7 +142,7 @@ void UI_Draw(void) {
     draw_status();
     draw_list();
     ST7565_Blit();
-    gScanning = 0;
+    gScanning = 0; (void)gScanning;
 }
 
 static void on_enter(void);
@@ -182,7 +177,13 @@ void UI_HandleKey(KEY_Code_t key, KEY_State_t state) {
         break;
 
     case KEY_SIDE1: // BL
-        if (gTab == TAB_LOOT && gLootCount > 0) {
+        if (APP_GetState() != APP_IDLE) {
+            // во время скана — BL текущей частоты
+            uint32_t f = gScanCurrentFreq;
+            if (f && gBlackCount < BL_MAX) {
+                gBlack[gBlackCount].lo = f; gBlack[gBlackCount].hi = 0; gBlackCount++;
+            }
+        } else if (gTab == TAB_LOOT && gLootCount > 0) {
             uint16_t idx = gScroll + gCursor;
             if (idx < gLootCount && gBlackCount < BL_MAX) {
                 gBlack[gBlackCount].lo = gLoot[idx].freq; gBlack[gBlackCount].hi = 0; gBlackCount++;
@@ -190,7 +191,16 @@ void UI_HandleKey(KEY_Code_t key, KEY_State_t state) {
         }
         break;
     case KEY_SIDE2: // WL
-        if (gTab == TAB_LOOT && gLootCount > 0) {
+        if (APP_GetState() != APP_IDLE) {
+            // во время скана — WL текущей частоты
+            uint32_t f = gScanCurrentFreq;
+            if (f && gChannelCount < MAX_CHANNELS) {
+                gChannels[gChannelCount].freq = f; gChannels[gChannelCount].freq_end = 0;
+                gChannels[gChannelCount].squelch = 3; gChannels[gChannelCount].step_khz = 0;
+                gChannels[gChannelCount].flags = 0; gChannels[gChannelCount].name[0] = 0;
+                gChannelCount++; ch_save();
+            }
+        } else if (gTab == TAB_LOOT && gLootCount > 0) {
             uint16_t idx = gScroll + gCursor;
             if (idx < gLootCount && gChannelCount < MAX_CHANNELS) {
                 gChannels[gChannelCount].freq = gLoot[idx].freq;
@@ -198,15 +208,15 @@ void UI_HandleKey(KEY_Code_t key, KEY_State_t state) {
                 gChannels[gChannelCount].step_khz = 0; gChannels[gChannelCount].flags = 0;
                 gChannels[gChannelCount].name[0] = 0; gChannelCount++; ch_save();
             }
-        } else if (gTab == TAB_RANGE && gCursor < PCOUNT) {
-            APP_StartScan(gPresets[gCursor][0], gPresets[gCursor][1], gPresets[gCursor][2]);
+        } else if (gTab == TAB_RANGE) {
+            APP_StartFullScan();
         } else if (gTab == TAB_SL && gScanCount > 0) {
-            APP_StartScanList(gScanList, gScanCount);
+            APP_StartFullScan();
         }
         break;
 
     case KEY_EXIT:
-        APP_Stop();
+        if (APP_GetState() != APP_IDLE) { APP_Stop(); break; }
         if (gTab == TAB_CH && gChannelCount > 0) {
             uint16_t ci = gScroll + gCursor;
             if (ci < gChannelCount) {
