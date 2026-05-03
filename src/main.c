@@ -158,7 +158,6 @@ static void cmd_SCR(const char *a) { (void)a;
             *p++ = GetPixel(x, y) ? '1' : '0';
         }
         *p++ = '\n';
-        // отправляем строку целиком, USB_CDC_Write сама разобьёт и подождёт
         USB_CDC_Write((uint8_t*)buf, p - buf);
     }
 }
