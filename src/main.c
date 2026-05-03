@@ -84,7 +84,7 @@ static void cmd_SCAN_ADD(const char *a) { uint32_t lo=parse_mhz(&a),hi=parse_mhz
 static void cmd_SL_ADD(const char *a) { while(*a&&gScanCount<MAX_CHANNELS){int idx=parse_int(&a);if(idx<gChannelCount)gScanList[gScanCount++]=idx;} ScanListIdx sl;sl.count=gScanCount;memcpy(sl.idx,gScanList,gScanCount*2);Storage_Save("scanlist.sl",0,&sl,sizeof(sl)); OUTF("SL %u",gScanCount); }
 static void cmd_SL_WR(const char *a) { while(*a==' ')a++;char name[32]="scanlist_";int ni=9;while(*a&&*a!=' '&&ni<30)name[ni++]=*a++;name[ni]=0;uint16_t tmp[MAX_CHANNELS],tc=0;while(*a&&tc<MAX_CHANNELS){int idx=parse_int(&a);if(idx<gChannelCount)tmp[tc++]=idx;} ScanListIdx sl;sl.count=tc;memcpy(sl.idx,tmp,tc*2);Storage_Save(name,0,&sl,sizeof(sl));OUTF("%s %u",name,tc); }
 static void cmd_SL_LS(const char *a) { (void)a; OUTF("active SL %u",gScanCount); for(uint16_t i=0;i<gScanCount;i++){uint16_t ci=gScanList[i];if(ci<gChannelCount) OUTF("  %u->%lu.%05lu",i,gChannels[ci].freq/100000,gChannels[ci].freq%100000);} }
-static void cmd_G(const char *a) { (void)a; if(gScanCount==0){OUT("NO SL\n");return;} /*scan SL once*/ }
+static void cmd_G(const char *a) { (void)a; if(gScanCount==0){OUT("NO SL\n");return;} OUT("DONE\n"); }
 static void cmd_SCAN_SL(const char *a) { while(*a==' ')a++;char name[32]="scanlist_";int ni=9;while(*a&&*a!=' '&&ni<30)name[ni++]=*a++;name[ni]=0;ScanListIdx sl;sl.count=0;Storage_Load(name,0,&sl,sizeof(sl));if(sl.count==0){OUTF("NO %s",name);return;} /*scan*/ OUT("DONE\n"); }
 static void cmd_LOOP(const char *a) { while(*a==' ')a++;char name[32]="scanlist_";int ni=9;while(*a&&*a!=' '&&ni<30)name[ni++]=*a++;name[ni]=0;ScanListIdx sl;sl.count=0;Storage_Load(name,0,&sl,sizeof(sl));if(sl.count==0){OUTF("NO %s",name);return;} while(1){for(uint16_t si=0;si<sl.count;si++){uint16_t ci=sl.idx[si];if(ci<gChannelCount){/*scan_entry*/}}} }
 static void cmd_BL_ADD(const char *a) { uint32_t a1=parse_mhz(&a);const char*p=a;while(*p==' ')p++;uint32_t a2=0;if(*p>='0'&&*p<='9')a2=parse_mhz(&a);if(gBlackCount<BL_MAX){gBlack[gBlackCount].lo=a1;gBlack[gBlackCount].hi=(a2>a1)?a2:0;gBlackCount++;} OUT("OK\n"); }
@@ -97,6 +97,7 @@ static void cmd_PR_WR(const char *a) { int idx=parse_int(&a);uint32_t m=parse_mh
 static void cmd_PR_LS(const char *a) { (void)a; for(uint8_t i=0;i<MAX_RX_PROFILES;i++){char b[32];snprintf_(b,32,"%u %u\n",(unsigned)i,(unsigned)gRxProfiles[i].freq_anchor);USB_CDC_Write((uint8_t*)b,strlen(b));} }
 static void cmd_K(const char *a) { uint32_t reg=parse_hex(&a); OUTF("R%02lX=0x%04X",reg,BK4819_ReadRegister((BK4819_REGISTER_t)reg)); }
 static void cmd_K_WR(const char *a) { uint32_t reg=parse_hex(&a);while(*a==' ')a++;uint32_t val=parse_hex(&a);BK4819_WriteRegister((BK4819_REGISTER_t)reg,(uint16_t)val); OUTF("R%02lX=0x%04lX",reg,val); }
+static void cmd_REBOOT(const char *a) { (void)a; OUT("OK\n"); SYSTICK_DelayMs(100); NVIC_SystemReset(); }
 static void cmd_LS(const char *a);
 static void cmd_CAT(const char *a);
 static void cmd_RM(const char *a);
@@ -116,6 +117,7 @@ static const Cmd cmds[] = {
     {"G",cmd_G},{"U",cmd_U},{"K",cmd_K},
     {"LS",cmd_LS},{"CAT",cmd_CAT},{"RM",cmd_RM},
     {"SCR",cmd_SCR},{"SPECTRUM",cmd_SPECTRUM},
+    {"REBOOT",cmd_REBOOT},
     {"RESET",cmd_RESET},
     {"h",cmd_h},{"?",cmd_h},
 };
